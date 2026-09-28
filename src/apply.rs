@@ -136,12 +136,12 @@ pub fn parse_edits(text: &str) -> ParseOutcome {
 pub fn render_diff(edit: &Edit) -> String {
     let mut s = String::new();
     for l in edit.search.lines() {
-        s.push_str("-");
+        s.push('-');
         s.push_str(l);
         s.push('\n');
     }
     for l in edit.replace.lines() {
-        s.push_str("+");
+        s.push('+');
         s.push_str(l);
         s.push('\n');
     }
