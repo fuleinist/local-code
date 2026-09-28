@@ -1,4 +1,5 @@
 mod apply;
+mod chat;
 mod cli;
 mod config;
 mod context;
@@ -8,7 +9,7 @@ mod ollama;
 
 use std::io::Write;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 
 use cli::{Backend, Cli};
@@ -40,8 +41,13 @@ async fn main() {
 async fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    if cli.chat {
-        bail!("chat mode lands in a later milestone; for now use: local-code \"<instruction>\"");
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(600))
+        .build()?;
+
+    if cli.chat || matches!(&cli.prompt, Some(p) if p == "chat") {
+        let mut resolved = config::resolve(&cli, &client).await?;
+        return chat::run(&cli, &client, &mut resolved).await;
     }
 
     let prompt = match &cli.prompt {
@@ -54,10 +60,6 @@ async fn run() -> Result<()> {
             unreachable!()
         }
     };
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(600))
-        .build()?;
 
     let resolved = config::resolve(&cli, &client).await?;
 

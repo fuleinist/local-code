@@ -100,6 +100,24 @@ pub async fn stream_chat<F>(
     model: &str,
     system: &str,
     user: &str,
+    on_token: F,
+) -> Result<String>
+where
+    F: FnMut(&str),
+{
+    let messages = vec![
+        serde_json::json!({"role": "system", "content": system}),
+        serde_json::json!({"role": "user", "content": user}),
+    ];
+    stream_chat_messages(client, base_url, model, &messages, on_token).await
+}
+
+/// Send a multi-turn chat request to Ollama and stream tokens to `on_token`.
+pub async fn stream_chat_messages<F>(
+    client: &reqwest::Client,
+    base_url: &str,
+    model: &str,
+    messages: &[serde_json::Value],
     mut on_token: F,
 ) -> Result<String>
 where
@@ -109,10 +127,7 @@ where
     let body = json!({
         "model": model,
         "stream": true,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
+        "messages": messages,
     });
     let resp = client
         .post(&url)
