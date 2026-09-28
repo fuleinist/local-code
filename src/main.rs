@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod context;
 mod ollama;
 
 use std::io::Write;
@@ -46,7 +47,16 @@ async fn run() -> Result<()> {
         bail!("the llama.cpp backend lands in a later milestone; use --backend ollama for now");
     }
 
-    let user_message = build_user_message(&cli, &prompt);
+    let user_message = {
+        let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        match context::gather(&root, &prompt, &cli.files, cli.context_tokens) {
+            Ok(gathered) => context::render(&prompt, &gathered),
+            Err(e) => {
+                eprintln!("local-code: context gathering failed ({e}); sending prompt only");
+                prompt.clone()
+            }
+        }
+    };
 
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
@@ -57,18 +67,4 @@ async fn run() -> Result<()> {
     .await?;
     writeln!(out)?;
     Ok(())
-}
-
-/// Compose the user message. Cycle 1: instruction only (+ explicitly named
-/// files are wired in with context gathering, F2).
-fn build_user_message(cli: &Cli, prompt: &str) -> String {
-    let mut msg = prompt.to_string();
-    if !cli.files.is_empty() {
-        let listed = cli.files.join(", ");
-        msg.push_str(&format!(
-            "\n\n(The user asked to include these files as context; file \
-             contents arrive in a later milestone: {listed})"
-        ));
-    }
-    msg
 }
