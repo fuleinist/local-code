@@ -51,4 +51,8 @@ pub struct Cli {
     /// Start an interactive multi-turn chat REPL.
     #[arg(long)]
     pub chat: bool,
+
+    /// With `local-code history`: show the full most-recent exchange.
+    #[arg(long)]
+    pub last: bool,
 }

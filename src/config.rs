@@ -156,6 +156,7 @@ impl Cli {
             backend: Backend::Auto,
             server_url: None,
             chat: false,
+            last: false,
         }
     }
 }

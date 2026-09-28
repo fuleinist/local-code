@@ -2,6 +2,7 @@ mod apply;
 mod cli;
 mod config;
 mod context;
+mod history;
 mod ollama;
 
 use std::io::Write;
@@ -43,6 +44,9 @@ async fn run() -> Result<()> {
     }
 
     let prompt = match &cli.prompt {
+        Some(p) if p == "history" => {
+            return run_history(&cli);
+        }
         Some(p) if !p.trim().is_empty() => p.clone(),
         _ => {
             Cli::parse_from(["local-code", "--help"]);
@@ -119,5 +123,46 @@ async fn run() -> Result<()> {
             std::process::exit(1);
         }
     }
+
+    // F5: persist the exchange (best effort; never fail the run over it).
+    match history::db_path().and_then(|p| history::open(&p)) {
+        Ok(conn) => {
+            let cwd = std::env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| ".".to_string());
+            if let Err(e) = history::record(&conn, &cwd, &resolved.model, &prompt, &response) {
+                eprintln!("local-code: warning: failed to record session history: {e}");
+            }
+        }
+        Err(e) => eprintln!("local-code: warning: history unavailable: {e}"),
+    }
+    Ok(())
+}
+
+fn run_history(cli: &Cli) -> Result<()> {
+    let path = history::db_path()?;
+    let conn = history::open(&path)?;
+    if cli.last {
+        match history::last(&conn)? {
+            Some(row) => {
+                println!("#{} {} (model: {}, cwd: {})", row.id, history::format_unix_ts(&row.ts), row.model, row.cwd);
+                println!("--- prompt ---\n{}", row.prompt);
+                println!("--- response ---\n{}", row.response);
+            }
+            None => println!("no sessions recorded yet"),
+        }
+        return Ok(());
+    }
+    let rows = history::recent(&conn, 20)?;
+    if rows.is_empty() {
+        println!("no sessions recorded yet");
+        return Ok(());
+    }
+    println!("recent sessions (newest first, db: {}):", path.display());
+    for row in rows {
+        let short: String = row.prompt.chars().take(70).collect();
+        println!("  #{}  {}  [{}]  {}", row.id, history::format_unix_ts(&row.ts), row.model, short);
+    }
+    println!("tip: local-code history --last  (show the most recent exchange in full)");
     Ok(())
 }

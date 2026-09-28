@@ -61,7 +61,31 @@ fn help_documents_flags() {
         "--backend",
         "--server-url",
         "--chat",
+        "--last",
     ] {
         assert!(help.contains(flag), "--help missing {flag}");
     }
+}
+
+#[test]
+fn history_empty_db() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("history.db");
+    let out = bin()
+        .arg("history")
+        .env("LOCAL_CODE_DB", &db)
+        .output()
+        .expect("failed to run local-code binary");
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("no sessions recorded yet"), "stdout: {stdout}");
+
+    // --last on empty db also succeeds.
+    let out = bin()
+        .args(["history", "--last"])
+        .env("LOCAL_CODE_DB", &db)
+        .output()
+        .expect("failed to run local-code binary");
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).contains("no sessions"));
 }
