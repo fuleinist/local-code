@@ -1,0 +1,20 @@
+[package]
+name = "local-code"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-config, offline-first AI coding assistant CLI for local models (Ollama, llama.cpp)"
+license = "MIT"
+repository = "https://github.com/fuleinist/local-code"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[profile.release]
+strip = true
+lto = "thin"
