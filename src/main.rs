@@ -3,6 +3,7 @@ mod cli;
 mod config;
 mod context;
 mod history;
+mod llama;
 mod ollama;
 
 use std::io::Write;
@@ -59,9 +60,6 @@ async fn run() -> Result<()> {
         .build()?;
 
     let resolved = config::resolve(&cli, &client).await?;
-    if resolved.backend == Backend::Llama {
-        bail!("the llama.cpp backend lands in a later milestone; use --backend ollama for now");
-    }
 
     let user_message = {
         let root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
@@ -78,18 +76,36 @@ async fn run() -> Result<()> {
 
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
-    let response = ollama::stream_chat(
-        &client,
-        &resolved.base_url,
-        &resolved.model,
-        system_prompt,
-        &user_message,
-        |tok| {
-            let _ = write!(out, "{tok}");
-            let _ = out.flush();
-        },
-    )
-    .await?;
+    let response = match resolved.backend {
+        Backend::Llama => {
+            llama::stream_chat(
+                &client,
+                &resolved.base_url,
+                &resolved.model,
+                system_prompt,
+                &user_message,
+                |tok| {
+                    let _ = write!(out, "{tok}");
+                    let _ = out.flush();
+                },
+            )
+            .await?
+        }
+        _ => {
+            ollama::stream_chat(
+                &client,
+                &resolved.base_url,
+                &resolved.model,
+                system_prompt,
+                &user_message,
+                |tok| {
+                    let _ = write!(out, "{tok}");
+                    let _ = out.flush();
+                },
+            )
+            .await?
+        }
+    };
     writeln!(out)?;
 
     if cli.apply {
